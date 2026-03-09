@@ -24,7 +24,7 @@ const initialBoard = [
   // --- TIER 1: ELITE (1-12) ---
   { rank: 1, name: "Bijan Robinson", pos: "RB", team: "ATL", note: "Consensus RB1. Tua pursuit could supercharge this offense." },
   { rank: 2, name: "Jahmyr Gibbs", pos: "RB", team: "DET", note: "Elite pass-catcher in best offense in football." },
-  { rank: 3, name: "Christian McCaffrey", pos: "RB", team: "SF", note: "When healthy, no ceiling. Biadasz OL signing helps." },
+  { rank: 3, name: "Christian McCaffrey", pos: "RB", team: "SF", note: "When healthy, no ceiling. Evans arrival boosts passing game." },
   { rank: 4, name: "Puka Nacua", pos: "WR", team: "LAR", note: "Best WR in football last 2 years. Target volume king." },
   { rank: 5, name: "Ja'Marr Chase", pos: "WR", team: "CIN", note: "Elite WR1. Burrow stack is cheat code." },
   { rank: 6, name: "Jaxon Smith-Njigba", pos: "WR", team: "SEA", note: "🔥 Walker departure = more passing volume in SEA. Top-5 WR.", trend: "up", trendAmt: 4 },
@@ -113,7 +113,7 @@ const initialBoard = [
   { rank: 81, name: "Rome Odunze", pos: "WR", team: "CHI", note: "🔥 DJ Moore gone = WR1 role for Caleb Williams.", trend: "up", trendAmt: 10 },
   { rank: 82, name: "Kyle Pitts", pos: "TE", team: "ATL", note: "🔥 Franchise tagged. Tua arrival = massive unlock.", trend: "up", trendAmt: 8 },
   { rank: 83, name: "Jordan Mason", pos: "RB", team: "MIN", note: "Moved to Vikings. Lead back potential." },
-  { rank: 84, name: "Ricky Pearsall", pos: "WR", team: "SF", note: "Emerging WR in SF. Biadasz helps OL." },
+  { rank: 84, name: "Ricky Pearsall", pos: "WR", team: "SF", note: "Emerging WR in SF. Evans arrival makes him WR2." },
   { rank: 85, name: "Chuba Hubbard", pos: "RB", team: "CAR", note: "Workhorse volume on weak team." },
   { rank: 86, name: "Chris Godwin", pos: "WR", team: "TB", note: "If healthy, still a PPR monster." },
   { rank: 87, name: "Alvin Kamara", pos: "RB", team: "NO", note: "Aging but elite pass-catcher. PPR gold." },
@@ -199,7 +199,7 @@ let fetchCount = 0;
 // Track free agency moves and their fantasy impact
 const knownMoves = [
   { time: "2026-03-09T12:05:00Z", player: "Kenneth Walker III", from: "SEA", to: "KC", deal: "3yr/$45M", impact: "Super Bowl MVP → Chiefs. RB1 for Mahomes. Massive upgrade.", fantasyChange: "up" },
-  { time: "2026-03-09T12:10:00Z", player: "Malik Willis", from: "TEN", to: "MIA", deal: "3yr/$67.5M ($45M gtd)", impact: "Starting QB in Miami. Running upside. Replaces Tua.", fantasyChange: "up" },
+  { time: "2026-03-09T12:10:00Z", player: "Malik Willis", from: "GB", to: "MIA", deal: "3yr/$67.5M ($45M gtd)", impact: "Starting QB in Miami. Running upside. Replaces Tua.", fantasyChange: "up" },
   { time: "2026-03-09T12:15:00Z", player: "Kenneth Gainwell", from: "PIT", to: "TB", deal: "2yr/$14M ($10M gtd)", impact: "Steelers MVP → committee role in Tampa with Irving.", fantasyChange: "up" },
   { time: "2026-03-09T12:20:00Z", player: "Tua Tagovailoa", from: "MIA", to: "FA → ATL (frontrunner)", deal: "Released ($99.2M dead cap)", impact: "Falcons pursuing. Could unlock Robinson, London, Pitts.", fantasyChange: "up" },
   { time: "2026-03-09T12:25:00Z", player: "Isaiah Likely", from: "BAL", to: "NYG", deal: "3yr/$40M", impact: "Reunited with Harbaugh. TE1 upside in New York.", fantasyChange: "up" },
@@ -211,7 +211,7 @@ const knownMoves = [
   { time: "2026-03-09T12:55:00Z", player: "Minkah Fitzpatrick", from: "MIA", to: "NYJ", deal: "3yr/$40M", impact: "IDP: Safety upgrade for Jets defense.", fantasyChange: "neutral" },
   { time: "2026-03-09T13:00:00Z", player: "Danielle Hunter", from: "HOU", to: "HOU", deal: "1yr/$40.1M extension", impact: "IDP: Elite edge stays in Houston.", fantasyChange: "neutral" },
   { time: "2026-03-09T13:05:00Z", player: "Alec Pierce", from: "IND", to: "IND", deal: "Re-signed", impact: "WR1 role locked in. Career year coming.", fantasyChange: "up" },
-  { time: "2026-03-09T13:10:00Z", player: "Tyler Biadasz", from: "BUF", to: "SF", deal: "3yr/$30M", impact: "OL upgrade for 49ers. Helps CMC, Purdy, Deebo.", fantasyChange: "neutral" },
+  { time: "2026-03-09T13:10:00Z", player: "Tyler Biadasz", from: "WAS", to: "LAC", deal: "3yr/$30M", impact: "OL upgrade for Chargers. Helps Herbert, Hampton, McConkey.", fantasyChange: "neutral" },
   { time: "2026-03-09T13:15:00Z", player: "Khalil Mack", from: "LAC", to: "LAC", deal: "1yr/$18M fully gtd", impact: "IDP: Returns to Chargers edge.", fantasyChange: "neutral" },
   { time: "2026-03-09T13:20:00Z", player: "Sheldon Rankins", from: "FA", to: "HOU", deal: "2yr/$12M gtd", impact: "IDP: DT upgrade for Texans defense.", fantasyChange: "neutral" },
   { time: "2026-03-09T13:25:00Z", player: "Rashan Gary", from: "GB", to: "DAL", deal: "Trade (for 2027 4th)", impact: "IDP: Edge rusher to Cowboys.", fantasyChange: "neutral" },
