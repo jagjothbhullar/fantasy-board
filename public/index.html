@@ -556,6 +556,7 @@
     let newsData = [];
     let activeFilter = 'ALL';
     let searchQuery = '';
+    let teamFilter = '';
     let countdown = 600;
 
     const tiers = [
@@ -813,8 +814,6 @@
     // ============================================================
     // FILTERS
     // ============================================================
-    let teamFilter = '';
-
     function setFilter(filter, btn) {
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
