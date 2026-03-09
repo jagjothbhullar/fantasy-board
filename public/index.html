@@ -624,7 +624,7 @@
     let newsData = [];
     let activeFilter = 'ALL';
     let searchQuery = '';
-    let countdown = 30;
+    let countdown = 60;
 
     const tiers = [
       { after: 0, label: 'TIER 1 — ELITE (ROUND 1 PICKS)' },
@@ -960,10 +960,10 @@
     });
 
     // ============================================================
-    // AUTO-REFRESH EVERY 30 SECONDS
+    // AUTO-REFRESH EVERY 60 SECONDS
     // ============================================================
     function startCountdown() {
-      countdown = 30;
+      countdown = 60;
       const el = document.getElementById('countdown');
 
       setInterval(() => {
@@ -971,7 +971,7 @@
         el.textContent = `${countdown}s`;
 
         if (countdown <= 0) {
-          countdown = 30;
+          countdown = 60;
           fetchBoard();
         }
       }, 1000);

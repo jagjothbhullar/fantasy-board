@@ -445,8 +445,8 @@ Do NOT include moves for players already tracked with these exact teams: ${moves
   }
 }
 
-// RSS polling every 30 seconds (lightweight, just fetches headlines)
-setInterval(fetchLatestNews, 30000);
+// RSS polling every 60 seconds (lightweight, just fetches headlines)
+setInterval(fetchLatestNews, 60000);
 fetchLatestNews(); // Initial fetch
 
 // Claude analysis every 10 minutes (processes buffered headlines)
