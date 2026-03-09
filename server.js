@@ -452,11 +452,42 @@ Do NOT include moves for players already tracked with these exact teams: ${moves
   }
 }
 
-// RSS polling every 60 seconds (lightweight, just fetches headlines)
-setInterval(fetchLatestNews, 60000);
-fetchLatestNews(); // Initial fetch
+// Schedule-aware polling: active 6:30 AM - 1:00 AM PT, single catch-up at 6:30 AM
+function isActiveHours() {
+  const now = new Date();
+  const pt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const hour = pt.getHours();
+  const min = pt.getMinutes();
+  const timeVal = hour * 60 + min; // minutes since midnight
+  // Active: 6:30 AM (390) to 1:00 AM next day (treat as 25:00 = 1500)
+  // Inactive: 1:00 AM (60) to 6:30 AM (390)
+  return timeVal >= 390 || timeVal < 60;
+}
 
-// Claude analysis every 10 minutes (processes buffered headlines)
+let overnightCatchUpDone = false;
+
+function scheduledFetch() {
+  const now = new Date();
+  const pt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const hour = pt.getHours();
+  const min = pt.getMinutes();
+  const timeVal = hour * 60 + min;
+
+  if (isActiveHours()) {
+    overnightCatchUpDone = false; // reset for next overnight
+    fetchLatestNews();
+  } else if (!overnightCatchUpDone && timeVal >= 390) {
+    // 6:30 AM catch-up fetch for overnight news
+    console.log('[Schedule] 6:30 AM catch-up — fetching overnight news');
+    overnightCatchUpDone = true;
+    fetchLatestNews();
+  }
+  // Otherwise: sleeping (1 AM - 6:30 AM), skip fetch
+}
+
+setInterval(scheduledFetch, 60000);
+fetchLatestNews(); // Initial fetch on startup
+
 async function runClaudeAnalysis() {
   if (pendingHeadlines.length === 0) {
     console.log('[Claude] No new headlines to analyze. Skipping.');
@@ -467,9 +498,8 @@ async function runClaudeAnalysis() {
   await analyzeNewsWithClaude(batch);
 }
 
-// Claude runs automatically after each RSS fetch (via fetchLatestNews)
-// Backup: also run every 10 minutes in case RSS fetch finds nothing new
-setInterval(runClaudeAnalysis, 10 * 60 * 1000);
+// Backup Claude run every 10 minutes during active hours
+setInterval(() => { if (isActiveHours()) runClaudeAnalysis(); }, 10 * 60 * 1000);
 
 // ============================================================
 // API ENDPOINTS
