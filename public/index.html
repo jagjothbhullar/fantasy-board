@@ -580,8 +580,19 @@
         FA MOVES FEED
         <span id="move-count" style="color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 12px;"></span>
       </div>
+      <div class="add-move-form" style="background: linear-gradient(135deg, #1a1040, #1a2236); border-bottom: 1px solid rgba(168, 85, 247, 0.3);">
+        <h3 style="display:flex;justify-content:space-between;align-items:center;">
+          AI AUTO-DETECT
+          <span id="claude-status" style="font-size:10px;font-weight:400;color:var(--text-dim)">Pending...</span>
+        </h3>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">Claude analyzes headlines every 10 min and auto-updates the board.</div>
+        <div style="display:flex;gap:6px;">
+          <button class="add-btn" style="background:var(--purple);flex:1;" onclick="runClaude()">RUN CLAUDE NOW</button>
+          <span id="pending-count" style="font-size:11px;color:var(--gold);align-self:center;min-width:80px;text-align:right;"></span>
+        </div>
+      </div>
       <div class="add-move-form">
-        <h3>+ Add Breaking Move</h3>
+        <h3>+ Add Manual Move</h3>
         <div class="form-row">
           <input type="text" id="move-player" placeholder="Player name">
           <input type="text" id="move-to" placeholder="New team (e.g. KC)">
@@ -644,6 +655,18 @@
         boardData = boardJson.board;
         movesData = movesJson.moves;
         newsData = movesJson.news || [];
+
+        // Update Claude status
+        const claudeEl = document.getElementById('claude-status');
+        const pendingEl = document.getElementById('pending-count');
+        if (boardJson.lastClaudeRun) {
+          const ago = Math.round((Date.now() - new Date(boardJson.lastClaudeRun).getTime()) / 60000);
+          claudeEl.textContent = `Last run: ${ago}m ago`;
+          claudeEl.style.color = ago < 12 ? 'var(--green)' : 'var(--gold)';
+        }
+        if (boardJson.pendingHeadlineCount !== undefined) {
+          pendingEl.textContent = `${boardJson.pendingHeadlineCount} queued`;
+        }
 
         renderBoard();
         renderMoves();
@@ -752,10 +775,12 @@
           tag = '<span class="move-tag tag-signed">SIGNED</span>';
         }
 
+        const autoBadge = m.auto ? '<span style="font-size:9px;background:rgba(168,85,247,0.2);color:#c084fc;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:6px;">AI</span>' : '';
+
         html += `
           <div class="move-card">
             <div class="move-header">
-              <span class="player-name">${m.player}</span>
+              <span class="player-name">${m.player}${autoBadge}</span>
               <span class="move-time">${time}</span>
             </div>
             <div class="move-route">
@@ -825,6 +850,39 @@
       document.getElementById('stat-moves').textContent = movesData.length;
       document.getElementById('stat-up').textContent = boardData.filter(p => p.trend === 'up').length;
       document.getElementById('stat-down').textContent = boardData.filter(p => p.trend === 'down').length;
+    }
+
+    // ============================================================
+    // RUN CLAUDE ANALYSIS
+    // ============================================================
+    async function runClaude() {
+      const btn = document.querySelector('[onclick="runClaude()"]');
+      btn.textContent = 'ANALYZING...';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+
+      try {
+        const res = await fetch('/api/analyze', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          btn.textContent = `FOUND ${data.totalMoves} MOVES`;
+          btn.style.background = 'var(--green)';
+        } else {
+          btn.textContent = data.message || 'NO NEW HEADLINES';
+          btn.style.background = 'var(--text-dim)';
+        }
+        await fetchBoard();
+      } catch (err) {
+        btn.textContent = 'ERROR';
+        btn.style.background = 'var(--red)';
+      }
+
+      setTimeout(() => {
+        btn.textContent = 'RUN CLAUDE NOW';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.background = 'var(--purple)';
+      }, 3000);
     }
 
     // ============================================================

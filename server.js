@@ -1,6 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
+import Anthropic from '@anthropic-ai/sdk';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
+const anthropic = new Anthropic();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -221,9 +225,17 @@ moves = [...knownMoves];
 // ============================================================
 
 const RSS_FEEDS = [
+  // Major sports outlets
   'https://www.espn.com/espn/rss/nfl/news',
   'https://api.foxsports.com/bifrost/v1/nfl/feed?type=rss',
   'https://www.cbssports.com/rss/headlines/nfl/',
+  // Fantasy-specific sources
+  'https://www.fantasypros.com/nfl/rss/news.php',
+  'https://www.rotowire.com/rss/nfl.xml',
+  'https://www.rotoworld.com/rss/nfl',
+  'https://ftnfantasy.com/rss/nfl',
+  'https://www.4for4.com/rss.xml',
+  'https://www.draftsharks.com/rss/news.xml',
 ];
 
 async function fetchLatestNews() {
@@ -257,7 +269,7 @@ async function fetchLatestNews() {
             description: descMatch ? descMatch[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]*>/g, '').trim() : '',
             link: linkMatch ? linkMatch[1].trim() : '',
             time: new Date().toISOString(),
-            source: feedUrl.includes('espn') ? 'ESPN' : feedUrl.includes('fox') ? 'FOX' : 'CBS'
+            source: feedUrl.includes('espn') ? 'ESPN' : feedUrl.includes('fox') ? 'FOX' : feedUrl.includes('cbs') ? 'CBS' : feedUrl.includes('fantasypros') ? 'FantasyPros' : feedUrl.includes('rotowire') ? 'RotoWire' : feedUrl.includes('rotoworld') ? 'RotoWorld' : feedUrl.includes('ftn') ? 'FTN' : feedUrl.includes('4for4') ? '4for4' : feedUrl.includes('draftsharks') ? 'DraftSharks' : 'NFL'
           });
         }
       }
@@ -287,15 +299,176 @@ async function fetchLatestNews() {
   }
   lastFetchTime = new Date().toISOString();
   console.log(`[Fetch #${fetchCount}] ${new Date().toLocaleTimeString()} — ${allItems.length} items, ${unique.length} FA-related`);
+
+  // Queue new headlines for Claude analysis
+  if (unique.length > 0) {
+    pendingHeadlines.push(...unique);
+  }
 }
 
-// Fetch news every 30 seconds
+// Buffer headlines between Claude runs
+let pendingHeadlines = [];
+
+// ============================================================
+// CLAUDE AI — Parse headlines into board moves automatically
+// ============================================================
+
+// Track headlines we've already analyzed to avoid duplicates
+const analyzedHeadlines = new Set();
+
+async function analyzeNewsWithClaude(headlines) {
+  // Only analyze headlines we haven't seen before
+  const newHeadlines = headlines.filter(h => !analyzedHeadlines.has(h.title));
+  if (newHeadlines.length === 0) return;
+
+  // Mark these as analyzed immediately to prevent re-processing
+  newHeadlines.forEach(h => analyzedHeadlines.add(h.title));
+
+  // Build the current board player list for Claude's context
+  const playerList = board.map(p => `${p.name} (${p.pos}, ${p.team})`).join(', ');
+
+  const headlineText = newHeadlines.map(h =>
+    `- [${h.source}] ${h.title}${h.description ? ': ' + h.description.slice(0, 150) : ''}`
+  ).join('\n');
+
+  try {
+    lastClaudeRun = new Date().toISOString();
+    console.log(`[Claude] Analyzing ${newHeadlines.length} new headlines...`);
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `You are a fantasy football analyst. Parse these NFL news headlines and extract ONLY concrete player moves (signings, trades, releases, franchise tags). Ignore rumors, speculation, and non-fantasy-relevant moves (coaches, punters, long snappers, practice squad).
+
+HEADLINES:
+${headlineText}
+
+CURRENT BOARD PLAYERS:
+${playerList}
+
+For each concrete move found, return a JSON array. Each object must have:
+- "player": full player name (must match board name if on board)
+- "from": previous team abbreviation (or "FA")
+- "to": new team abbreviation
+- "deal": contract details if mentioned (e.g. "3yr/$45M") or "Trade" or "Released"
+- "impact": one sentence fantasy football impact analysis
+- "fantasyChange": "up" if the move helps their fantasy value, "down" if it hurts, "neutral" if minimal impact
+- "affectedPlayers": array of objects for OTHER players on the board affected by this move, each with {"name", "impact", "fantasyChange"} — e.g. if a WR signs with a team, the existing WR1 there might trend down
+
+Return ONLY valid JSON array. If no concrete moves found, return [].
+Do NOT include moves for players already tracked with these exact teams: ${moves.map(m => `${m.player}→${m.to}`).join(', ')}`
+      }]
+    });
+
+    const text = response.content[0].text.trim();
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.log('[Claude] No moves extracted');
+      return;
+    }
+
+    const parsedMoves = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsedMoves) || parsedMoves.length === 0) {
+      console.log('[Claude] No new moves found');
+      return;
+    }
+
+    console.log(`[Claude] Found ${parsedMoves.length} new moves!`);
+
+    for (const m of parsedMoves) {
+      // Check if we already have this exact move
+      const isDuplicate = moves.some(existing =>
+        existing.player.toLowerCase() === m.player.toLowerCase() &&
+        existing.to.toLowerCase() === m.to.toLowerCase()
+      );
+      if (isDuplicate) continue;
+
+      // Add to moves list
+      const move = {
+        time: new Date().toISOString(),
+        player: m.player,
+        from: m.from || 'FA',
+        to: m.to,
+        deal: m.deal || 'TBD',
+        impact: m.impact || '',
+        fantasyChange: m.fantasyChange || 'neutral',
+        auto: true // flag that Claude added this
+      };
+      moves.push(move);
+      console.log(`  → ${m.player}: ${m.from} → ${m.to} (${m.deal}) [${m.fantasyChange}]`);
+
+      // Update the player on the board
+      const idx = board.findIndex(p =>
+        p.name.toLowerCase() === m.player.toLowerCase() ||
+        p.name.toLowerCase().includes(m.player.toLowerCase()) ||
+        m.player.toLowerCase().includes(p.name.toLowerCase())
+      );
+      if (idx !== -1) {
+        board[idx].team = m.to;
+        board[idx].note = `🤖 ${m.deal || 'Signed'} with ${m.to}. ${m.impact || ''}`;
+        if (m.fantasyChange === 'up') {
+          board[idx].trend = 'up';
+          board[idx].trendAmt = (board[idx].trendAmt || 0) + 5;
+        } else if (m.fantasyChange === 'down') {
+          board[idx].trend = 'down';
+          board[idx].trendAmt = (board[idx].trendAmt || 0) + 5;
+        }
+      }
+
+      // Handle affected players (ripple effects)
+      if (m.affectedPlayers && Array.isArray(m.affectedPlayers)) {
+        for (const affected of m.affectedPlayers) {
+          const aIdx = board.findIndex(p =>
+            p.name.toLowerCase() === affected.name?.toLowerCase() ||
+            p.name.toLowerCase().includes(affected.name?.toLowerCase()) ||
+            affected.name?.toLowerCase().includes(p.name.toLowerCase())
+          );
+          if (aIdx !== -1) {
+            const arrow = affected.fantasyChange === 'up' ? '🔥' : affected.fantasyChange === 'down' ? '⬇️' : '';
+            board[aIdx].note = `${arrow} ${affected.impact || 'Affected by ' + m.player + ' move.'}`;
+            if (affected.fantasyChange === 'up' || affected.fantasyChange === 'down') {
+              board[aIdx].trend = affected.fantasyChange;
+              board[aIdx].trendAmt = (board[aIdx].trendAmt || 0) + 3;
+            }
+          }
+        }
+      }
+    }
+
+    lastFetchTime = new Date().toISOString();
+  } catch (err) {
+    console.log(`[Claude] Error: ${err.message}`);
+  }
+}
+
+// RSS polling every 30 seconds (lightweight, just fetches headlines)
 setInterval(fetchLatestNews, 30000);
 fetchLatestNews(); // Initial fetch
+
+// Claude analysis every 10 minutes (processes buffered headlines)
+async function runClaudeAnalysis() {
+  if (pendingHeadlines.length === 0) {
+    console.log('[Claude] No new headlines to analyze. Skipping.');
+    return;
+  }
+  const batch = [...pendingHeadlines];
+  pendingHeadlines = [];
+  await analyzeNewsWithClaude(batch);
+}
+
+setInterval(runClaudeAnalysis, 10 * 60 * 1000); // Every 10 minutes
+// Run first Claude analysis after 15 seconds (let RSS feeds load first)
+setTimeout(runClaudeAnalysis, 15000);
 
 // ============================================================
 // API ENDPOINTS
 // ============================================================
+
+let lastClaudeRun = null;
 
 app.get('/api/board', (req, res) => {
   res.json({
@@ -303,8 +476,20 @@ app.get('/api/board', (req, res) => {
     lastUpdated: lastFetchTime,
     moveCount: moves.length,
     fetchCount,
+    lastClaudeRun,
+    pendingHeadlineCount: pendingHeadlines.length,
     timestamp: new Date().toISOString()
   });
+});
+
+// Manually trigger Claude analysis
+app.post('/api/analyze', async (req, res) => {
+  const count = pendingHeadlines.length;
+  if (count === 0) {
+    return res.json({ success: false, message: 'No pending headlines to analyze.' });
+  }
+  await runClaudeAnalysis();
+  res.json({ success: true, analyzed: count, totalMoves: moves.length });
 });
 
 app.get('/api/moves', (req, res) => {
