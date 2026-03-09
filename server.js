@@ -283,11 +283,17 @@ async function fetchLatestNews() {
     }
   }
 
-  // Filter for free agency / signing / trade keywords
+  // Filter for FA keywords OR mentions of players on our board
   const faKeywords = ['sign', 'trade', 'release', 'cut', 'deal', 'agree', 'free agent', 'contract', 'extension', 'franchise', 'waiv', 'claim'];
+  const boardLastNames = board.map(p => {
+    const parts = p.name.split(' ');
+    return parts[parts.length - 1].toLowerCase();
+  });
   const relevantNews = allItems.filter(item => {
     const text = (item.title + ' ' + item.description).toLowerCase();
-    return faKeywords.some(kw => text.includes(kw));
+    const hasFAKeyword = faKeywords.some(kw => text.includes(kw));
+    const mentionsPlayer = boardLastNames.some(name => name.length > 3 && text.includes(name));
+    return hasFAKeyword || mentionsPlayer;
   });
 
   // Deduplicate by title similarity
