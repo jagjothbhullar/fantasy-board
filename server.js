@@ -328,9 +328,6 @@ async function analyzeNewsWithClaude(headlines) {
   const newHeadlines = headlines.filter(h => !analyzedHeadlines.has(h.title));
   if (newHeadlines.length === 0) return;
 
-  // Mark these as analyzed immediately to prevent re-processing
-  newHeadlines.forEach(h => analyzedHeadlines.add(h.title));
-
   // Build the current board player list for Claude's context
   const playerList = board.map(p => `${p.name} (${p.pos}, ${p.team})`).join(', ');
 
@@ -344,7 +341,7 @@ async function analyzeNewsWithClaude(headlines) {
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      max_tokens: 4000,
       messages: [{
         role: 'user',
         content: `You are a fantasy football analyst. Parse these NFL news headlines and extract ONLY concrete player moves (signings, trades, releases, franchise tags). Ignore rumors, speculation, and non-fantasy-relevant moves (coaches, punters, long snappers, practice squad).
@@ -370,21 +367,34 @@ Do NOT include moves for players already tracked with these exact teams: ${moves
     });
 
     const text = response.content[0].text.trim();
+    console.log(`[Claude] Raw response (${text.length} chars):`, text.slice(0, 500));
 
     // Extract JSON from response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.log('[Claude] No moves extracted');
+      console.log('[Claude] No JSON array found in response');
       return;
     }
 
-    const parsedMoves = JSON.parse(jsonMatch[0]);
+    let parsedMoves;
+    try {
+      parsedMoves = JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      console.error('[Claude] JSON parse error:', parseErr.message);
+      console.log('[Claude] Raw JSON:', jsonMatch[0].slice(0, 300));
+      return;
+    }
+
     if (!Array.isArray(parsedMoves) || parsedMoves.length === 0) {
-      console.log('[Claude] No new moves found');
+      console.log('[Claude] Parsed but empty array');
+      newHeadlines.forEach(h => analyzedHeadlines.add(h.title));
       return;
     }
 
     console.log(`[Claude] Found ${parsedMoves.length} new moves!`);
+
+    // Mark headlines as analyzed only after successful extraction
+    newHeadlines.forEach(h => analyzedHeadlines.add(h.title));
 
     for (const m of parsedMoves) {
       // Check if we already have this exact move
@@ -525,6 +535,21 @@ app.post('/api/analyze', async (req, res) => {
   }
   await runClaudeAnalysis();
   res.json({ success: true, analyzed: count, totalMoves: moves.length });
+});
+
+app.get('/api/debug', (req, res) => {
+  res.json({
+    lastClaudeRun,
+    fetchCount,
+    pendingHeadlines: pendingHeadlines.length,
+    analyzedHeadlines: analyzedHeadlines.size,
+    totalMoves: moves.length,
+    autoMoves: moves.filter(m => m.auto).length,
+    manualMoves: moves.filter(m => !m.auto).length,
+    newsItems: newsItems.length,
+    hasApiKey: !!process.env.ANTHROPIC_API_KEY,
+    activeHours: isActiveHours(),
+  });
 });
 
 app.get('/api/moves', (req, res) => {
