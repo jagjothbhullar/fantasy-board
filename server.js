@@ -269,15 +269,18 @@ async function fetchLatestNews() {
       const itemRegex = /<item>([\s\S]*?)<\/item>/g;
       let match;
       while ((match = itemRegex.exec(text)) !== null) {
-        const titleMatch = match[1].match(/<title>([\s\S]*?)<\/title>/);
-        const descMatch = match[1].match(/<description>([\s\S]*?)<\/description>/);
-        const linkMatch = match[1].match(/<link>([\s\S]*?)<\/link>/);
+        const item = match[1];
+        const titleMatch = item.match(/<title>([\s\S]*?)<\/title>/);
+        const descMatch = item.match(/<description>([\s\S]*?)<\/description>/);
+        const linkMatch = item.match(/<link>\s*(https?:\/\/[^\s<]+)\s*<\/link>/);
+        const pubDateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+        const pubTime = pubDateMatch ? new Date(pubDateMatch[1].trim()).toISOString() : new Date().toISOString();
         if (titleMatch) {
           allItems.push({
             title: titleMatch[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim(),
             description: descMatch ? descMatch[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]*>/g, '').trim() : '',
             link: linkMatch ? linkMatch[1].trim() : '',
-            time: new Date().toISOString(),
+            time: pubTime,
             source: feedUrl.includes('espn') ? 'ESPN' : feedUrl.includes('fox') ? 'FOX' : feedUrl.includes('cbs') ? 'CBS' : feedUrl.includes('fantasypros') ? 'FantasyPros' : feedUrl.includes('rotowire') ? 'RotoWire' : feedUrl.includes('rotoworld') ? 'RotoWorld' : feedUrl.includes('ftn') ? 'FTN' : feedUrl.includes('4for4') ? '4for4' : feedUrl.includes('draftsharks') ? 'DraftSharks' : 'NFL'
           });
         }
@@ -310,7 +313,12 @@ async function fetchLatestNews() {
   });
 
   if (unique.length > 0) {
-    newsItems = unique.slice(0, 25);
+    // Only keep articles from last 24 hours, sorted newest first
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    newsItems = unique
+      .filter(item => new Date(item.time).getTime() > cutoff)
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 25);
   }
   lastFetchTime = new Date().toISOString();
   console.log(`[Fetch #${fetchCount}] ${new Date().toLocaleTimeString()} — ${allItems.length} items, ${unique.length} FA-related`);
