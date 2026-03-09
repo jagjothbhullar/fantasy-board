@@ -184,7 +184,7 @@ const initialBoard = [
   { rank: 143, name: "Malik Willis", pos: "QB", team: "MIA", note: "🔥 3yr/$67.5M. Starting QB. Rushing upside in MIA.", trend: "up", trendAmt: 20 },
   { rank: 144, name: "Kendre Miller", pos: "RB", team: "NO", note: "Lead back potential if Kamara ages out." },
   { rank: 145, name: "Quentin Johnston", pos: "WR", team: "LAC", note: "Year 3. Herbert's deep threat." },
-  { rank: 146, name: "Wan'Dale Robinson", pos: "WR", team: "FA", note: "Free agent slot WR." },
+  { rank: 146, name: "Wan'Dale Robinson", pos: "WR", team: "TEN", note: "🔥 Titans 4yr/$78M. Slot WR1 role. Huge PPR upside.", trend: "up", trendAmt: 40 },
   { rank: 147, name: "Sean Tucker", pos: "RB", team: "TB", note: "⬇️ Gainwell arrival pushes him down depth chart.", trend: "down", trendAmt: 4 },
   { rank: 148, name: "Calvin Ridley", pos: "WR", team: "TEN", note: "Veteran. Declining production." },
   { rank: 149, name: "Jerry Jeudy", pos: "WR", team: "CLE", note: "Talent stuck in bad offense." },
@@ -224,7 +224,7 @@ const knownMoves = [
   { time: "2026-03-09T14:00:00Z", player: "Travis Etienne Jr.", from: "JAX", to: "NO", deal: "4yr/$52M", impact: "Lead back in New Orleans. RB10 last year. Huge volume.", fantasyChange: "up" },
   { time: "2026-03-09T14:05:00Z", player: "Mike Evans", from: "TB", to: "SF", deal: "Signed", impact: "Ageless WR1 joins CMC + Purdy. Elite offense.", fantasyChange: "up" },
   { time: "2026-03-09T14:10:00Z", player: "Tyler Allgeier", from: "ATL", to: "ARI", deal: "2yr/$12.25M", impact: "Crowded backfield with Benson/Conner. Limited upside.", fantasyChange: "down" },
-  { time: "2026-03-09T14:15:00Z", player: "Allen Robinson", from: "FA", to: "TEN", deal: "4yr/$78M", impact: "Titans WR1. Big-money deal signals volume.", fantasyChange: "up" },
+  { time: "2026-03-09T14:15:00Z", player: "Wan'Dale Robinson", from: "NYG", to: "TEN", deal: "4yr/$78M", impact: "Titans slot WR. Big-money deal signals volume.", fantasyChange: "up" },
 ];
 
 moves = [...knownMoves];
