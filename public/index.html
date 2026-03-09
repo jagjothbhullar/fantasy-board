@@ -624,7 +624,7 @@
     let newsData = [];
     let activeFilter = 'ALL';
     let searchQuery = '';
-    let countdown = 60;
+    let countdown = 600;
 
     const tiers = [
       { after: 0, label: 'TIER 1 — ELITE (ROUND 1 PICKS)' },
@@ -960,18 +960,20 @@
     });
 
     // ============================================================
-    // AUTO-REFRESH EVERY 60 SECONDS
+    // AUTO-REFRESH EVERY 10 MINUTES (matches Claude cycle)
     // ============================================================
     function startCountdown() {
-      countdown = 60;
+      countdown = 600;
       const el = document.getElementById('countdown');
 
       setInterval(() => {
         countdown--;
-        el.textContent = `${countdown}s`;
+        const mins = Math.floor(countdown / 60);
+        const secs = countdown % 60;
+        el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
 
         if (countdown <= 0) {
-          countdown = 60;
+          countdown = 600;
           fetchBoard();
         }
       }, 1000);
