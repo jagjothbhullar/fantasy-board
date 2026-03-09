@@ -805,18 +805,36 @@
     // ============================================================
     // RENDER TICKER
     // ============================================================
+    let lastTickerContent = '';
     function renderTicker() {
       const ticker = document.getElementById('ticker');
-      const items = movesData.slice(0, 15).map(m => {
+
+      // Combine moves + live news headlines into one ticker
+      const moveItems = movesData.slice(0, 15).map(m => {
         let tag = 'tag-signed';
         let label = 'SIGNED';
         if (m.deal?.toLowerCase().includes('trade')) { tag = 'tag-trade'; label = 'TRADE'; }
         else if (m.deal?.toLowerCase().includes('release')) { tag = 'tag-released'; label = 'CUT'; }
-        return `<span class="ticker-item"><span class="move-tag ${tag}">${label}</span> ${m.player} → ${m.to} ${m.deal ? `(${m.deal})` : ''}</span>`;
+        const ai = m.auto ? ' 🤖' : '';
+        return `<span class="ticker-item"><span class="move-tag ${tag}">${label}</span> ${m.player} → ${m.to} ${m.deal ? `(${m.deal})` : ''}${ai}</span>`;
       }).join('');
 
-      // Duplicate for seamless scroll
-      ticker.innerHTML = items + items;
+      const newsTickerItems = newsData.slice(0, 10).map(n =>
+        `<span class="ticker-item" style="color:var(--text-dim);"><span class="move-tag" style="background:rgba(6,182,212,0.2);color:var(--cyan);">NEWS</span> ${n.title}</span>`
+      ).join('');
+
+      const combined = moveItems + newsTickerItems;
+
+      // Only update DOM if content changed (preserves scroll animation)
+      if (combined !== lastTickerContent) {
+        lastTickerContent = combined;
+        // Reset animation by cloning
+        ticker.style.animation = 'none';
+        ticker.innerHTML = combined + combined;
+        // Force reflow then restart
+        ticker.offsetHeight;
+        ticker.style.animation = '';
+      }
     }
 
     // ============================================================
@@ -852,8 +870,9 @@
     // UPDATE STATS
     // ============================================================
     function updateStats() {
-      document.getElementById('stat-players').textContent = boardData.length;
-      document.getElementById('stat-moves').textContent = movesData.length;
+      const movedNames = new Set(movesData.map(m => m.player.toLowerCase()));
+      const movedCount = boardData.filter(p => movedNames.has(p.name.toLowerCase())).length;
+      document.getElementById('stat-moves').textContent = movedCount;
       document.getElementById('stat-up').textContent = boardData.filter(p => p.trend === 'up').length;
       document.getElementById('stat-down').textContent = boardData.filter(p => p.trend === 'down').length;
     }
