@@ -5,6 +5,11 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const anthropic = new Anthropic();
+let lastClaudeRun = null;
+
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.warn('[WARNING] ANTHROPIC_API_KEY not set — Claude analysis will not work!');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -300,9 +305,11 @@ async function fetchLatestNews() {
   lastFetchTime = new Date().toISOString();
   console.log(`[Fetch #${fetchCount}] ${new Date().toLocaleTimeString()} — ${allItems.length} items, ${unique.length} FA-related`);
 
-  // Queue new headlines for Claude analysis
+  // Queue new headlines for Claude analysis and run immediately
   if (unique.length > 0) {
     pendingHeadlines.push(...unique);
+    // Run Claude right away instead of waiting for the 10-min timer
+    runClaudeAnalysis();
   }
 }
 
@@ -441,7 +448,7 @@ Do NOT include moves for players already tracked with these exact teams: ${moves
 
     lastFetchTime = new Date().toISOString();
   } catch (err) {
-    console.log(`[Claude] Error: ${err.message}`);
+    console.error(`[Claude] Error: ${err.message}`, err.status || '');
   }
 }
 
@@ -460,15 +467,13 @@ async function runClaudeAnalysis() {
   await analyzeNewsWithClaude(batch);
 }
 
-setInterval(runClaudeAnalysis, 10 * 60 * 1000); // Every 10 minutes
-// Run first Claude analysis after 15 seconds (let RSS feeds load first)
-setTimeout(runClaudeAnalysis, 15000);
+// Claude runs automatically after each RSS fetch (via fetchLatestNews)
+// Backup: also run every 10 minutes in case RSS fetch finds nothing new
+setInterval(runClaudeAnalysis, 10 * 60 * 1000);
 
 // ============================================================
 // API ENDPOINTS
 // ============================================================
-
-let lastClaudeRun = null;
 
 app.get('/api/board', (req, res) => {
   res.json({
