@@ -480,10 +480,31 @@ Do NOT include moves for players already tracked with these exact teams: ${moves
   }
 }
 
-// Schedule-aware polling: active 6:30 AM - 1:00 AM PT, single catch-up at 6:30 AM
-function isActiveHours() {
+// Schedule-aware polling: runs every 5 days, active 6:30 AM - 1:00 AM PT on update days
+const UPDATE_INTERVAL_DAYS = 5;
+let lastUpdateDate = null; // tracks the last date we ran updates (YYYY-MM-DD in PT)
+
+function getPTDate() {
   const now = new Date();
-  const pt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  return new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+}
+
+function getPTDateString() {
+  const pt = getPTDate();
+  return pt.toISOString().slice(0, 10);
+}
+
+function isUpdateDay() {
+  const today = getPTDateString();
+  if (!lastUpdateDate) return true; // first run always updates
+  const last = new Date(lastUpdateDate);
+  const now = new Date(today);
+  const diffDays = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+  return diffDays >= UPDATE_INTERVAL_DAYS;
+}
+
+function isActiveHours() {
+  const pt = getPTDate();
   const hour = pt.getHours();
   const min = pt.getMinutes();
   const timeVal = hour * 60 + min; // minutes since midnight
@@ -493,28 +514,47 @@ function isActiveHours() {
 }
 
 let overnightCatchUpDone = false;
+let updateDayActive = false;
 
 function scheduledFetch() {
-  const now = new Date();
-  const pt = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  if (!isUpdateDay() && !updateDayActive) {
+    return; // not an update day, skip
+  }
+
+  const pt = getPTDate();
   const hour = pt.getHours();
   const min = pt.getMinutes();
   const timeVal = hour * 60 + min;
 
   if (isActiveHours()) {
-    overnightCatchUpDone = false; // reset for next overnight
+    if (!updateDayActive) {
+      lastUpdateDate = getPTDateString();
+      updateDayActive = true;
+      console.log(`[Schedule] Update day activated (every ${UPDATE_INTERVAL_DAYS} days). Next update ~${UPDATE_INTERVAL_DAYS} days from now.`);
+    }
+    overnightCatchUpDone = false;
     fetchLatestNews();
-  } else if (!overnightCatchUpDone && timeVal >= 390) {
-    // 6:30 AM catch-up fetch for overnight news
+  } else if (updateDayActive && !overnightCatchUpDone && timeVal >= 390) {
     console.log('[Schedule] 6:30 AM catch-up — fetching overnight news');
     overnightCatchUpDone = true;
     fetchLatestNews();
+  } else if (updateDayActive && timeVal >= 60 && timeVal < 390) {
+    // Overnight window on an update day — wind down
+    updateDayActive = false;
+    console.log('[Schedule] Update day complete. Sleeping until next update day.');
   }
-  // Otherwise: sleeping (1 AM - 6:30 AM), skip fetch
 }
 
 setInterval(scheduledFetch, 60000);
-fetchLatestNews(); // Initial fetch on startup
+// Initial fetch on startup only if it's an update day
+if (isUpdateDay()) {
+  lastUpdateDate = getPTDateString();
+  updateDayActive = true;
+  fetchLatestNews();
+  console.log(`[Schedule] Startup: update day. Polling active. Next update in ~${UPDATE_INTERVAL_DAYS} days.`);
+} else {
+  console.log(`[Schedule] Startup: not an update day. Last update: ${lastUpdateDate || 'never'}. Waiting.`);
+}
 
 async function runClaudeAnalysis() {
   if (pendingHeadlines.length === 0) {
@@ -526,8 +566,8 @@ async function runClaudeAnalysis() {
   await analyzeNewsWithClaude(batch);
 }
 
-// Backup Claude run every 10 minutes during active hours
-setInterval(() => { if (isActiveHours()) runClaudeAnalysis(); }, 10 * 60 * 1000);
+// Claude analysis every 10 minutes, but only on update days during active hours
+setInterval(() => { if (updateDayActive && isActiveHours()) runClaudeAnalysis(); }, 10 * 60 * 1000);
 
 // ============================================================
 // API ENDPOINTS
